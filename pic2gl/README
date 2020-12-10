@@ -1,0 +1,152 @@
+Skeleton 2D Electrostatic Gridless Particle-in-Cell (PIC) codes
+by Viktor K. Decyk
+copyright 1999-2019, regents of the university of california
+
+This program contains sample codes for illustrating the basic structure
+of a 2D Electrostatic Gridless Particle-in-Cell (PIC) code, in Fortran
+with C wrappers.  The codes have no diagnosics except for initial and
+final energies.  Their primary purpose is to provide example codes for
+physical science students learning about PIC codes.  They are also
+intended as benchmark reference codes to aid in developing new codes and
+in evaluating new computer architectures.
+
+Gridless PIC codes are based on an exact solution of many interacting
+particles, based on a fourier series.  The only approximations are a
+finite time step and a truncation of the fourier series, as well as
+round off errors.  The first gridless code was developed by John Dawson
+in the 1960s for electrostatic systems, and is described in 
+John M. Dawson, "The Electrostatic Sheet Model for a Plasma and its
+Modification to Finite-Size Particles," Methods in Computational
+Physics, volume 9, B. Alder, S. Fernback, and M. Rotenburg, Ed.
+[Academic Press, New York, 1970, p. 1.
+
+Traditional PIC codes are widely used in plasma physics.  They model
+plasmas as particles which interact self-consistently via the
+electromagnetic fields they themselves produce.  PIC codes generally
+have three important procedures in the main iteration loop.  The first
+is the deposit, where some particle quantity, such as a charge, is
+accumulated on a grid via interpolation to produce a source density.
+The gridless code calculates the fourier co-efficients directly without
+using a grid or FFTs.  The second important procedure is the field
+solver, which solves Maxwell’s equation or a subset to obtain the
+electric and/or magnetic fields from the source densities.  The solver
+in the gridless code is the same as a spectral solver in a traditional
+PIC code, except that the number of fourier modes used can vary and the
+fields remain in fourier space.  In a traditional PIC code, once the
+fields are obtained in real space, the particle forces are found by
+interpolation from the grid, and the particle co-ordinates are updated,
+using Newton’s second law.  The gridless code calculates the electric
+field at the particle's location directly from the fourier series
+without use of a grid or interpolation.  Updating the particle
+co-ordinates is the same as in a traditional PIC code.  The particle
+processing parts dominate over the field solving parts in a typical PIC 
+application.  The gridless code is MUCH slower than a traditional code,
+scaling as the number of particles TIMES the number of fourier modes
+retained.  Gridless codes are much more accurate and do not suffer from
+aliasing errors.  They are especially useful when unusual errors are
+occurring in a traditional PIC code, or for very precise calculations.
+
+More details about traditional PIC codes can be found in the texts by
+C. K. Birdsall and A. B. Langdon, Plasma Physics via Computer
+Simulation, 1985, R. W. Hockney and J. W. Eastwood, Computer Simulation
+Using Particles, 1981, and John M. Dawson, "Particle simulation of
+plasmas", Rev. Mod. Phys. 55, 403 (1983).  Details about the
+mathematical equations used in the gridless code and units used in this
+code is given in the companion article, "Description of Electrostatic
+Spectral Code from the UPIC Framework" by Viktor K. Decyk, UCLA, in the
+file ESModelsGL.pdf.
+
+No warranty for proper operation of this software is given or implied.
+Software or information may be copied, distributed, and used at own
+risk; it may not be distributed without this notice included verbatim
+with each file.  If use of these codes results in a publication, an
+acknowledgement is requested.
+
+The code here uses the simplest force, the electrostatic Coulomb
+interaction, obtained by solving a Poisson equation.  The boundary
+conditions are periodic, only electron species are included.
+
+Particles are initialized with a uniform distribution in space and a
+gaussian distribution in velocity space.  This describes a plasma in
+thermal equilibrium.  The inner loop contains a charge deposit, a
+Poisson solver, and a particle push procedure.  The final energy and
+timings are printed.  A sample output file for the default input
+parameters is included in the file output.
+
+In more detail, the inner loop of the code contains the following
+procedures in Fortran (C):
+
+Deposit section:
+   DPOST2GL (cdpost2gl): deposit charge density
+
+Field solve section:
+   POIS22GL (cpois22gl): calculate smoothed longitudinal electric field
+                         in fourier space.
+
+Particle Push section:
+   PUSH2GL (cpush2gl): update particle co-ordinates with smoothed
+                       electric field:
+                       x(t)->x(t+dt/2); v(t-dt/2)->v(t+dt/2)
+
+The inputs to the code are the grid parameters indx, indy, the particle
+number parameters npx, npy, the time parameters tend, dt, the velocity 
+parameters vtx, vty, vx0, vy0, and the fourier mode parameters nxhm,
+nyhm.
+
+In more detail:
+indx = exponent which determines length in x direction, nx=2**indx.
+indy = exponent which determines length in y direction, ny=2**indy.
+   These ensure the system lengths are a power of 2.
+npx = number of electrons distributed in x direction.
+npy = number of electrons distributed in y direction.
+   The total number of particles in the simulation is npx*npy.
+tend = time at end of simulation, in units of plasma frequency.
+dt = time interval between successive calculations.
+   The number of time steps the code runs is given by tend/dt.
+vtx/vty = thermal velocity of electrons in x/y direction
+   a typical value is 1.0.
+vx0/vy0 = drift velocity of electrons in x/y direction.
+nxhm/nyhm = number of fourier modes kept in x/y direction.
+
+The major program files contained here include:
+pic2gl.f90    Fortran90 main program 
+pic2gl.c      C main program
+push2gl.f     Fortran77 procedure library
+push2gl_h.f90 Fortran90 procedure interface (header) library
+push2gl_f.c   C wrapper functions for calling the Fortran routines in C
+push2gl.h     C procedure header library
+dtimer.c      C timer function, used by both C and Fortran
+
+Files with the suffix .f90 adhere to the Fortran 90 standard, files with
+the suffix .f adhere to the Fortran77 standard, files with the suffix .c
+and .h adhere to the C99 standard.
+
+The makefile is setup to use gcc and gfortran with Linux.  A version for
+Mac OS X is also in the Makefile, but is commented out.  
+
+Two executables can be created, fpic2gl for Fortran and cpic2gl_f for C.
+
+To compile program, execute:
+
+Make program_name
+
+where program_name is either: fpic2gl or cpic2gl_f, or execute:
+
+make
+
+to create both programs.
+
+To execute, type the name of the executable:
+
+./program_name
+
+where program_name is either fpic2gl or cpic2gl_f
+
+The file output contains the results produced for the default parameters.
+
+The codes are compiled for double precision by default, but the Fortran
+code can be compiled to run in single precision by changing the Makefile
+(typically by removing the compiler options flag -r8).
+
+The library push2gl_f.c contains wrapper functions to allow the Fortran
+library to be called from C.
